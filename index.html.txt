@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Home, 
+  Search, 
+  Heart, 
+  User, 
+  Camera, 
+  ShoppingBag, 
+  X, 
+  Check, 
+  Share2, 
+  Sparkles, 
+  TrendingUp, 
+  DollarSign, 
+  RefreshCw,
+  Shirt,
+  ArrowRight,
+  Play,
+  Plus,
+  Minus,
+  CreditCard,
+  Zap,
+  Star,
+  Map,
+  ShieldCheck,
+  Globe,
+  Users,
+  MessageSquare,
+  Send
+} from 'lucide-react';
+
+// --- GEMINI API SETUP ---
+const apiKey = ""; // API Key provided by environment
+
+const callGemini = async (prompt, systemInstruction = "") => {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+  
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }],
+    systemInstruction: { parts: [{ text: systemInstruction }] },
+    generationConfig: {
+      responseMimeType: "application/json"
+    }
+  };
+
+  let attempt = 0;
+  const delays = [1000, 2000, 4000, 8000, 16000];
+
+  while (attempt <= 5) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      
+      const data = await response.json();
+      return JSON.parse(data.candidates[0].content.parts[0].text);
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed:`, error);
+      if (attempt === 5) return null;
+      await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+      attempt++;
+    }
+  }
+};
+
+/**
+ * ------------------------------------------------------------------
+ * MOCK DATA
+ * ------------------------------------------------------------------
+ */
+
+const MOCK_PRODUCTS = [
+  {
+    id: 1,
+    name: "Cyber Y2K Cargo Pants",
+    brand: "FutureFit",
+    price: 45.00,
+    originalPrice: 65.00,
+    image: "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+    category: "bottoms",
+    trending: true,
+    hasPriceDrop: true,
+    tags: ["baggy", "streetwear", "utility"],
+    description: "Heavyweight cotton utility pants with 6 pockets and adjustable ankle straps."
+  },
+  {
+    id: 2,
+    name: "Neon Crop Puffer",
+    brand: "GlowUp",
+    price: 89.99,
+    originalPrice: 89.99,
+    image: "https://images.unsplash.com/photo-1545291730-f2f75c30686d?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+    category: "outerwear",
+    trending: true,
+    hasPriceDrop: false,
+    tags: ["winter", "neon", "cropped"],
+    description: "Stand out in the dark with this high-vis cropped puffer jacket. Thermal insulated."
+  },
+  {
+    id: 3,
+    name: "Vintage Oversized Tee",
+    brand: "RetroRevive",
+    price: 25.00,
+    originalPrice: 25.00,
+    image: "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+    category: "tops",
+    trending: false,
+    hasPriceDrop: false,
+    tags: ["vintage", "graphic", "cotton"],
+    description: "Authentic 90s vintage wash tee with cracked graphic print."
+  },
+  {
+    id: 4,
+    name: "Chunky Platform Sneakers",
+    brand: "Stomp",
+    price: 110.00,
+    originalPrice: 140.00,
+    image: "https://images.unsplash.com/photo-1603808033192-082d6919d3e1?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+    category: "shoes",
+    trending: true,
+    hasPriceDrop: true,
+    tags: ["chunky", "platform", "90s"],
+    description: "Triple-stacked sole sneakers for maximum height and attitude."
+  },
+  {
+    id: 5,
+    name: "Bucket Hat - Acid Wash",
+    brand: "VibeCheck Originals",
+    price: 18.00,
+    originalPrice: 18.00,
+    image: "https://images.unsplash.com/photo-1575428652377-a2697240dac5?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+    category: "accessories",
+    trending: false,
+    hasPriceDrop: false,
+    tags: ["summer", "denim"],
+    description: "Essential festival wear. Acid wash denim bucket hat."
+  }
+];
+
+const LANDING_PRODUCTS = [
+  {
+    id: 201,
+    name: "Structured Oversized Blazer",
+    brand: "ACNE STUDIOS",
+    price: 450.00,
+    image: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&q=80&w=800"
+  },
+  {
+    id: 202,
+    name: "Technical Cargo Trousers",
+    brand: "ARC'TERYX",
+    price: 180.00,
+    image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&q=80&w=800"
+  },
+  {
+    id: 203,
+    name: "Distressed Knit Sweater",
+    brand: "MAISON MARGIELA",
+    price: 650.00,
+    image: "https://images.unsplash.com/photo-1620799140408-ed5341cd2431?auto=format&fit=crop&q=80&w=800"
+  },
+  {
+    id: 204,
+    name: "Leather Chelsea Boots",
+    brand: "COMMON PROJECTS",
+    price: 520.00,
+    image: "https://images.unsplash.com/photo-1608256246200-53e635b5b65f?auto=format&fit=crop&q=80&w=800"
+  },
+  {
+    id: 205,
+    name: "Heavyweight Cotton Hoodie",
+    brand: "FEAR OF GOD",
+    price: 195.00,
+    image: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&q=80&w=800"
+  }
+];
+
+const MOCK_OUTFIT_SUGGESTIONS = [
+  {
+    id: 101,
+    title: "Coffee Date Vibe",
+    items: [MOCK_PRODUCTS[0], MOCK_PRODUCTS[2], MOCK_PRODUCTS[4]],
+    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&auto=format&fit=crop"
+  },
+  {
+    id: 102,
+    title: "Late Night Drive",
+    items: [MOCK_PRODUCTS[1], MOCK_PRODUCTS[0], MOCK_PRODUCTS[3]],
+    image: "https://images.unsplash.com/photo-1550614000-4b9519e02a48?w=600&auto=format&fit=crop"
+  }
+];
+
+/**
+ * ------------------------------------------------------------------
+ * COMPONENTS
+ * ------------------------------------------------------------------
+ */
+
+// 1. Reusable Product Card
+const ProductCard = ({ product, onOpen, onSave, isSaved }) => (
+  <div 
+    onClick={() => onOpen(product)}
+    className="relative bg-gray-900 rounded-xl overflow-hidden shadow-lg border border-gray-800 mb-4 group cursor-pointer hover:border-neon-green/30 transition-all"
+  >
+    <div className="relative h-64 overflow-hidden">
+      <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+      {product.hasPriceDrop && (
+        <span className="absolute top-2 left-2 bg-neon-green text-black text-[10px] font-bold px-2 py-1 rounded-full animate-pulse flex items-center gap-1">
+          <TrendingUp size={10} /> DROP
+        </span>
+      )}
+      <button 
+        onClick={(e) => { e.stopPropagation(); onSave(product); }}
+        className="absolute top-2 right-2 p-2 bg-black/50 backdrop-blur-md rounded-full text-white hover:bg-neon-pink hover:text-white transition-colors"
+      >
+        <Heart size={18} fill={isSaved ? "#ff00ff" : "none"} className={isSaved ? "text-neon-pink" : ""} />
+      </button>
+    </div>
+    <div className="p-4">
+      <div className="flex justify-between items-start">
+        <div>
+          <h3 className="text-white font-bold text-lg leading-tight group-hover:text-neon-green transition-colors">{product.name}</h3>
+          <p className="text-gray-400 text-xs uppercase tracking-wide mt-1">{product.brand}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-white font-bold text-lg">${product.price}</p>
+          {product.originalPrice > product.price && (
+            <p className="text-gray-500 text-xs line-through">${product.originalPrice}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// 2. Tinder-Style Swipe Card
+const SwipeCard = ({ product, onSwipe }) => {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-gray-700 h-[75vh] flex flex-col relative animate-in zoom-in duration-300">
+        <div className="relative flex-grow">
+          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+          <div className="absolute top-0 inset-x-0 p-4 bg-gradient-to-b from-black/60 to-transparent">
+             <div className="flex justify-between items-center">
+                <span className="bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">{product.brand}</span>
+             </div>
+          </div>
+          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/80 to-transparent p-6 pt-24">
+            <h2 className="text-3xl font-black text-white mb-1 leading-none">{product.name}</h2>
+            <div className="flex items-center gap-3 mb-3">
+                <p className="text-neon-green text-2xl font-bold">${product.price}</p>
+                {product.hasPriceDrop && <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded font-bold">SALE</span>}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {product.tags.map(tag => (
+                <span key={tag} className="text-[10px] uppercase font-bold bg-white/10 text-gray-300 px-2 py-1 rounded-sm backdrop-blur-md border border-white/5">#{tag}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        <div className="h-24 flex justify-center items-center gap-8 bg-black border-t border-gray-800 z-10">
+          <button 
+            onClick={() => onSwipe('left')}
+            className="w-16 h-16 rounded-full bg-gray-900 flex items-center justify-center text-red-500 border border-gray-800 hover:border-red-500 hover:bg-red-500/10 transition-all shadow-lg hover:scale-110 active:scale-95"
+          >
+            <X size={32} />
+          </button>
+          <button 
+            onClick={() => onSwipe('right')}
+            className="w-16 h-16 rounded-full bg-gray-900 flex items-center justify-center text-neon-green border border-gray-800 hover:border-neon-green hover:bg-neon-green/10 transition-all shadow-lg hover:scale-110 active:scale-95 shadow-neon-green/20"
+          >
+            <Heart size={32} fill="currentColor" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 3. Product Detail Modal (Updated with Vibe Check)
+const ProductDetailModal = ({ product, isOpen, onClose, onAddToCart, onSave, isSaved }) => {
+    const [aiDescription, setAiDescription] = useState(null);
+    const [isLoadingAi, setIsLoadingAi] = useState(false);
+
+    useEffect(() => {
+        setAiDescription(null); // Reset when product changes
+    }, [product]);
+
+    if (!isOpen || !product) return null;
+
+    const handleVibeCheck = async () => {
+        setIsLoadingAi(true);
+        const prompt = `Give me a 1-sentence, super slang-filled Gen Z "vibe check" description for these ${product.name}. Make it sound like a hypebeast or fashion influencer reviewing it. Return JSON: { "hype": "the text" }`;
+        
+        const result = await callGemini(prompt);
+        if (result && result.hype) {
+            setAiDescription(result.hype);
+        } else {
+            setAiDescription("This fit goes hard, no cap.");
+        }
+        setIsLoadingAi(false);
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4">
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onClick={onClose} />
+            <div className="relative bg-zinc-950 w-full max-w-lg sm:rounded-3xl rounded-t-3xl border border-white/10 shadow-2xl overflow-hidden h-[90vh] sm:h-auto flex flex-col animate-in slide-in-from-bottom duration-300">
+                
+                {/* Image Header */}
+                <div className="relative h-1/2 sm:h-96">
+                    <img src={product.image} className="w-full h-full object-cover" />
+                    <button onClick={onClose} className="absolute top-4 right-4 bg-black/50 backdrop-blur-md p-2 rounded-full text-white hover:bg-white/20">
+                        <X size={20} />
+                    </button>
+                    <div className="absolute bottom-4 right-4 flex gap-2">
+                        <button onClick={handleVibeCheck} className="bg-black/60 backdrop-blur-xl p-2 rounded-full text-neon-green hover:bg-white/10 border border-neon-green/30 animate-pulse-fast flex items-center gap-2 px-4">
+                            <Sparkles size={16} /> ✨ Vibe Check
+                        </button>
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 p-6 flex flex-col overflow-y-auto">
+                    {/* AI Generated Hype Description */}
+                    {isLoadingAi && (
+                        <div className="mb-4 p-3 bg-zinc-900/50 rounded-xl border border-white/5 flex items-center gap-2 text-xs text-zinc-400">
+                            <RefreshCw className="animate-spin" size={14} /> Generating vibe check...
+                        </div>
+                    )}
+                    {aiDescription && (
+                        <div className="mb-4 p-4 bg-gradient-to-r from-emerald-900/20 to-purple-900/20 rounded-xl border border-white/10 animate-in fade-in zoom-in">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Sparkles size={14} className="text-yellow-400" />
+                                <span className="text-xs font-bold text-yellow-400 uppercase tracking-widest">AI Stylist Says</span>
+                            </div>
+                            <p className="text-sm font-medium text-white italic">"{aiDescription}"</p>
+                        </div>
+                    )}
+
+                    <div className="flex justify-between items-start mb-2">
+                        <div>
+                            <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">{product.brand}</p>
+                            <h2 className="text-3xl font-black text-white leading-tight mt-1">{product.name}</h2>
+                        </div>
+                        <div className="text-right">
+                             <p className="text-2xl font-bold text-white">${product.price}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 mb-6">
+                        <div className="flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded text-xs text-zinc-400">
+                            <Star size={12} className="text-yellow-500 fill-current" /> 4.8
+                        </div>
+                        <div className="flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded text-xs text-zinc-400">
+                            <Zap size={12} className="text-neon-green fill-current" /> High Demand
+                        </div>
+                    </div>
+
+                    <p className="text-zinc-400 text-sm leading-relaxed mb-6">
+                        {product.description || "No description available. Just vibes."}
+                    </p>
+
+                    <div className="mt-auto pt-4 border-t border-zinc-900 flex gap-4">
+                         <button 
+                            onClick={() => onSave(product)}
+                            className={`p-4 rounded-xl border flex items-center justify-center ${isSaved ? 'border-neon-pink bg-neon-pink/10 text-neon-pink' : 'border-zinc-800 text-zinc-400'}`}
+                         >
+                            <Heart size={24} fill={isSaved ? "currentColor" : "none"} />
+                         </button>
+                         <button 
+                            onClick={() => { onAddToCart(product); onClose(); }}
+                            className="flex-1 bg-white text-black font-bold text-lg rounded-xl hover:bg-zinc-200 transition-colors shadow-lg shadow-white/10"
+                         >
+                            Add to Cart
+                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// 4. Cart Drawer
+const CartDrawer = ({ isOpen, onClose, cartItems, onUpdateQty, onCheckout, isCheckingOut }) => {
+    if (!isOpen) return null;
+
+    const total = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+
+    return (
+        <div className="fixed inset-0 z-[70] flex justify-end">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
+            <div className="relative w-full max-w-md bg-zinc-950 h-full border-l border-white/10 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+                <div className="p-6 border-b border-white/5 flex justify-between items-center">
+                    <h2 className="text-xl font-bold font-mono">YOUR BAG ({cartItems.length})</h2>
+                    <button onClick={onClose}><X size={24} className="text-zinc-500 hover:text-white" /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {cartItems.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-zinc-600 opacity-50">
+                            <ShoppingBag size={48} className="mb-4" />
+                            <p>Bag is empty.</p>
+                        </div>
+                    ) : (
+                        cartItems.map(item => (
+                            <div key={item.id} className="flex gap-4">
+                                <img src={item.image} className="w-20 h-24 object-cover rounded-lg bg-zinc-900" />
+                                <div className="flex-1 flex flex-col justify-between">
+                                    <div>
+                                        <h3 className="font-bold text-sm">{item.name}</h3>
+                                        <p className="text-zinc-500 text-xs mt-1">{item.brand}</p>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <p className="font-bold">${item.price}</p>
+                                        <div className="flex items-center gap-3 bg-zinc-900 rounded-lg px-2 py-1">
+                                            <button onClick={() => onUpdateQty(item.id, -1)}><Minus size={14} /></button>
+                                            <span className="text-xs font-bold w-4 text-center">{item.quantity}</span>
+                                            <button onClick={() => onUpdateQty(item.id, 1)}><Plus size={14} /></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {cartItems.length > 0 && (
+                    <div className="p-6 border-t border-white/10 bg-zinc-900/50">
+                        <div className="flex justify-between mb-4 text-zinc-400 text-sm">
+                            <span>Subtotal</span>
+                            <span>${total.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between mb-6 text-xl font-bold text-white">
+                            <span>Total</span>
+                            <span>${total.toFixed(2)}</span>
+                        </div>
+                        <button 
+                            onClick={onCheckout}
+                            disabled={isCheckingOut}
+                            className="w-full bg-neon-green text-black font-bold py-4 rounded-xl hover:bg-emerald-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            {isCheckingOut ? (
+                                <RefreshCw className="animate-spin" />
+                            ) : (
+                                <>Checkout <ArrowRight size={18} /></>
+                            )}
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// 5. Landing Page - PROFESSIONAL / AFFILIATE READY
+const LandingPage = ({ onEnter }) => {
+  return (
+    <div className="min-h-screen bg-black text-white font-sans selection:bg-emerald-500/30 overflow-x-hidden">
+      
+      {/* 1. PROFESSIONAL NAVBAR */}
+      <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <Sparkles className="text-black" size={20} />
+            </div>
+            <div>
+              <h1 className="font-bold tracking-widest text-xl leading-none">VIBE CHECK</h1>
+              <p className="text-[10px] text-zinc-400 uppercase tracking-[0.25em] mt-1">Fashion Intelligence</p>
+            </div>
+          </div>
+          
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-400">
+            <a href="#features" className="hover:text-white transition-colors">Features</a>
+            <a href="#discovery" className="hover:text-white transition-colors">Discovery</a>
+            <a href="#mission" className="hover:text-white transition-colors">Mission</a>
+          </nav>
+
+          <button 
+            onClick={onEnter}
+            className="flex items-center gap-2 bg-white text-black px-6 py-2.5 rounded-full text-xs font-bold hover:bg-zinc-200 transition-all transform hover:scale-105"
+          >
+            Launch App
+          </button>
+        </div>
+      </header>
+
+      {/* 2. HERO SECTION - High Trust & Clarity */}
+      <section className="relative pt-32 pb-20 px-6 overflow-hidden">
+        {/* Abstract Background */}
+        <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[100px] pointer-events-none" />
+
+        <div className="max-w-5xl mx-auto text-center relative z-10">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 mb-8 backdrop-blur-md">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+            <span className="text-xs font-medium tracking-wide text-zinc-300">The Future of Social Commerce</span>
+          </div>
+          
+          <h2 className="text-6xl md:text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-zinc-600 leading-[0.95] mb-8">
+            DISCOVER.<br/>CURATE. SHOP.
+          </h2>
+          
+          <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto font-light leading-relaxed mb-10">
+            Vibe Check is the premier destination for discovering high-fidelity fashion. 
+            We connect you directly with the world's most coveted brands through an immersive, 
+            AI-powered interface designed for the modern shopper.
+          </p>
+
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+             <button 
+                onClick={onEnter}
+                className="bg-white text-black px-10 py-4 rounded-full font-bold text-sm tracking-wide hover:bg-zinc-200 transition-colors inline-flex items-center justify-center gap-2 shadow-[0_0_40px_rgba(255,255,255,0.2)]"
+             >
+                Start Exploring <ArrowRight size={16} />
+             </button>
+             <button className="px-10 py-4 rounded-full font-bold text-sm tracking-wide border border-zinc-800 hover:bg-zinc-900 transition-colors text-white">
+                View Lookbook
+             </button>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. MOCKUP / APP PREVIEW */}
+      <section className="py-20 px-6">
+        <div className="max-w-6xl mx-auto">
+            <div className="relative aspect-video rounded-3xl overflow-hidden border border-white/10 bg-zinc-900 shadow-2xl">
+                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-900/20 to-black/40" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center p-8">
+                        <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center mx-auto mb-4 border border-white/20">
+                            <Play size={24} className="ml-1 fill-white text-white" />
+                        </div>
+                        <h3 className="text-2xl font-bold">Interactive Shopping Experience</h3>
+                    </div>
+                </div>
+                {/* Mock UI Elements floating */}
+                <div className="absolute bottom-10 left-10 p-4 bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 max-w-xs">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-full bg-zinc-800" />
+                        <div className="h-2 w-20 bg-zinc-700 rounded" />
+                    </div>
+                    <div className="h-2 w-32 bg-zinc-800 rounded" />
+                </div>
+            </div>
+        </div>
+      </section>
+
+      {/* 4. FEATURES & DISCOVERY (Addressing "Map" & "Discovery") */}
+      <section id="features" className="py-24 bg-zinc-950 border-y border-white/5">
+        <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-16">
+                <h3 className="text-zinc-500 font-bold tracking-widest text-xs uppercase mb-4">Core Features</h3>
+                <h2 className="text-4xl md:text-5xl font-bold text-white">Curated for the Culture.</h2>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+                <div className="p-8 rounded-3xl bg-zinc-900/50 border border-white/5 hover:border-emerald-500/30 transition-colors group">
+                    <div className="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-emerald-500/20 group-hover:text-emerald-500 transition-colors">
+                        <Map size={24} />
+                    </div>
+                    <h4 className="text-xl font-bold mb-3">Global Vibe Map</h4>
+                    <p className="text-zinc-400 leading-relaxed">
+                        Discover trending styles by location. See what's popping in Tokyo, NYC, and London through our geo-tagged style feeds.
+                    </p>
+                </div>
+                <div className="p-8 rounded-3xl bg-zinc-900/50 border border-white/5 hover:border-emerald-500/30 transition-colors group">
+                    <div className="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-emerald-500/20 group-hover:text-emerald-500 transition-colors">
+                        <Sparkles size={24} />
+                    </div>
+                    <h4 className="text-xl font-bold mb-3">AI Stylist</h4>
+                    <p className="text-zinc-400 leading-relaxed">
+                        Our advanced AI analyzes your preferences to curate personalized outfits and suggest products that match your unique vibe.
+                    </p>
+                </div>
+                <div className="p-8 rounded-3xl bg-zinc-900/50 border border-white/5 hover:border-emerald-500/30 transition-colors group">
+                    <div className="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-emerald-500/20 group-hover:text-emerald-500 transition-colors">
+                        <ShieldCheck size={24} />
+                    </div>
+                    <h4 className="text-xl font-bold mb-3">Verified Authentic</h4>
+                    <p className="text-zinc-400 leading-relaxed">
+                        Shop with confidence. We partner directly with authorized retailers and brands to ensure every item is 100% authentic.
+                    </p>
+                </div>
+            </div>
+        </div>
+      </section>
+
+      {/* 5. BRAND MISSION / TRUST (Crucial for Affiliate) */}
+      <section id="mission" className="py-24 px-6 relative">
+         <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-3xl md:text-4xl font-bold mb-8">Empowering Expression</h2>
+            <p className="text-xl text-zinc-400 leading-relaxed mb-12">
+                Vibe Check isn't just a store; it's a movement. We believe that style is the ultimate form of self-expression. 
+                Our mission is to democratize access to high-fashion by aggregating the world's best inventory into one seamless, 
+                trustworthy platform.
+            </p>
+            <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+                <span className="text-xl font-bold tracking-tighter">ACNE STUDIOS</span>
+                <span className="text-xl font-bold tracking-tighter">ARC'TERYX</span>
+                <span className="text-xl font-bold tracking-tighter">RICK OWENS</span>
+                <span className="text-xl font-bold tracking-tighter">BALENCIAGA</span>
+            </div>
+         </div>
+      </section>
+
+      {/* 6. FOOTER - Compliance & Links */}
+      <footer className="border-t border-white/10 bg-zinc-950 pt-20 pb-10">
+        <div className="max-w-7xl mx-auto px-6">
+            <div className="grid md:grid-cols-4 gap-12 mb-16">
+                <div className="col-span-1 md:col-span-2">
+                    <div className="flex items-center gap-2 mb-6">
+                        <Sparkles className="text-emerald-500" size={20} />
+                        <span className="font-bold tracking-widest">VIBE CHECK</span>
+                    </div>
+                    <p className="text-zinc-500 max-w-sm mb-6">
+                        The ultimate digital storefront for the next generation of fashion consumers. 
+                        Curated, authentic, and always on vibe.
+                    </p>
+                    <div className="flex gap-4">
+                        <input 
+                            type="email" 
+                            placeholder="Join our newsletter" 
+                            className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2 text-sm text-white outline-none focus:border-emerald-500 w-full max-w-[200px]"
+                        />
+                        <button className="bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-lg text-sm font-bold">
+                            Join
+                        </button>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 className="font-bold text-white mb-6">Company</h4>
+                    <ul className="space-y-4 text-sm text-zinc-500">
+                        <li><a href="#" className="hover:text-emerald-500 transition-colors">About Us</a></li>
+                        <li><a href="#" className="hover:text-emerald-500 transition-colors">Careers</a></li>
+                        <li><a href="#" className="hover:text-emerald-500 transition-colors">Brand Partners</a></li>
+                        <li><a href="#" className="hover:text-emerald-500 transition-colors">Contact</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 className="font-bold text-white mb-6">Legal</h4>
+                    <ul className="space-y-4 text-sm text-zinc-500">
+                        <li><a href="#" className="hover:text-emerald-500 transition-colors">Privacy Policy</a></li>
+                        <li><a href="#" className="hover:text-emerald-500 transition-colors">Terms of Service</a></li>
+                        <li><a href="#" className="hover:text-emerald-500 transition-colors">Affiliate Disclosure</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center text-xs text-zinc-600">
+                <p>© 2024 Vibe Check Inc. All rights reserved.</p>
+                <div className="flex items-center gap-2 mt-4 md:mt-0">
+                    <span className="flex items-center gap-1"><Globe size={12} /> Global Shipping</span>
+                    <span className="w-1 h-1 bg-zinc-800 rounded-full mx-2" />
+                    <span>Secure Payments</span>
+                </div>
+            </div>
+            
+            <div className="mt-8 text-[10px] text-zinc-700 text-center max-w-3xl mx-auto">
+                Vibe Check participates in various affiliate marketing programs, which means we may get paid commissions on editorially chosen products purchased through our links to retailer sites.
+            </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+// 7. Virtual Try-On Canvas (Simplified for web)
+const VirtualTryOn = ({ savedItems }) => {
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [bgImage, setBgImage] = useState(null);
+    
+    const handleImageUpload = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setBgImage(reader.result);
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+  
+    return (
+      <div className="h-full flex flex-col p-4">
+        <h2 className="text-2xl font-black text-white mb-4 flex items-center">
+          <Camera className="mr-2 text-neon-pink" /> Virtual Try-On
+        </h2>
+  
+        <div className="flex-grow bg-gray-800 rounded-2xl relative overflow-hidden border-2 border-dashed border-gray-600 flex items-center justify-center">
+          {bgImage ? (
+            <>
+              <img src={bgImage} alt="User" className="w-full h-full object-cover opacity-80" />
+              {selectedItem && (
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 transition-all cursor-move active:scale-105">
+                   {/* In a real app, this would be a draggable canvas layer */}
+                   <div className="relative border-2 border-neon-green rounded-lg p-1 bg-black/20 backdrop-blur-sm">
+                     <img src={selectedItem.image} alt="Try On" className="w-full h-auto rounded" />
+                     <div className="absolute -top-3 -right-3 bg-neon-green text-black p-1 rounded-full">
+                      <RefreshCw size={12} />
+                     </div>
+                   </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center p-6">
+              <div className="mx-auto w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                <Camera size={32} className="text-gray-400" />
+              </div>
+              <p className="text-gray-300 mb-4">Upload a photo to see the fit</p>
+              <label className="bg-neon-pink text-white font-bold py-2 px-6 rounded-full cursor-pointer hover:opacity-90 transition-opacity">
+                Upload Photo
+                <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+              </label>
+            </div>
+          )}
+        </div>
+  
+        <div className="h-32 mt-4">
+          <p className="text-gray-400 text-sm mb-2">Select from Closet:</p>
+          <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+            {savedItems.length === 0 && (
+              <p className="text-gray-600 italic text-sm">Save items first to try them on!</p>
+            )}
+            {savedItems.map(item => (
+              <button 
+                key={item.id} 
+                onClick={() => setSelectedItem(item)}
+                className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${selectedItem?.id === item.id ? 'border-neon-green' : 'border-transparent'}`}
+              >
+                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+// 8. AI Stylist Chat Modal (NEW FEATURE)
+const AIStylistModal = ({ isOpen, onClose, products, onAddToCart }) => {
+    const [messages, setMessages] = useState([
+        { role: 'ai', text: "Hey bestie! 💖 I'm your AI stylist. Tell me the vibe (e.g., 'techno rave in Berlin' or 'cozy library date') and I'll build you a fit." }
+    ]);
+    const [input, setInput] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+
+    if (!isOpen) return null;
+
+    const handleSend = async () => {
+        if (!input.trim()) return;
+        
+        const userMsg = { role: 'user', text: input };
+        setMessages(prev => [...prev, userMsg]);
+        setInput("");
+        setIsLoading(true);
+
+        const productCatalog = products.map(p => ({ id: p.id, name: p.name, tags: p.tags, price: p.price }));
+        
+        const prompt = `
+            You are a Gen Z fashion stylist. 
+            User Request: "${input}". 
+            Available Products: ${JSON.stringify(productCatalog)}.
+            
+            Task:
+            1. Respond with a short, sassy, supportive message using Gen Z slang.
+            2. Recommend 1-3 specific product IDs from the list that match the request.
+            
+            Return ONLY JSON: { "message": "your text", "productIds": [1, 2] }
+        `;
+
+        const response = await callGemini(prompt, "You are a helpful fashion assistant API that returns strict JSON.");
+        
+        setIsLoading(false);
+        
+        if (response) {
+            setMessages(prev => [...prev, { 
+                role: 'ai', 
+                text: response.message,
+                recommendations: response.productIds 
+            }]);
+        } else {
+            setMessages(prev => [...prev, { role: 'ai', text: "Oop, my wifi is acting up. Try again?" }]);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center sm:p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onClick={onClose} />
+            <div className="relative bg-zinc-950 w-full max-w-lg sm:rounded-3xl rounded-t-3xl border border-white/10 shadow-2xl overflow-hidden h-[85vh] sm:h-[600px] flex flex-col animate-in slide-in-from-bottom duration-300">
+                <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-900">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="text-neon-pink" size={18} />
+                        <h3 className="font-bold text-white">AI Stylist</h3>
+                    </div>
+                    <button onClick={onClose}><X size={20} className="text-zinc-400" /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {messages.map((msg, idx) => (
+                        <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                            <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-neon-green text-black' : 'bg-zinc-800 text-white'}`}>
+                                {msg.text}
+                            </div>
+                            {/* Render Recommended Products Cards inside chat */}
+                            {msg.recommendations && (
+                                <div className="mt-2 flex gap-2 overflow-x-auto max-w-full pb-2 no-scrollbar">
+                                    {msg.recommendations.map(id => {
+                                        const product = products.find(p => p.id === id);
+                                        if (!product) return null;
+                                        return (
+                                            <div key={id} className="min-w-[120px] bg-black border border-white/10 rounded-lg p-2 flex flex-col gap-2">
+                                                <img src={product.image} className="w-full h-24 object-cover rounded-md" />
+                                                <p className="text-[10px] font-bold truncate text-white">{product.name}</p>
+                                                <button 
+                                                    onClick={() => onAddToCart(product)}
+                                                    className="bg-white text-black text-[10px] py-1 rounded font-bold hover:bg-zinc-200"
+                                                >
+                                                    Add ${product.price}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                    {isLoading && (
+                        <div className="flex items-center gap-2 text-zinc-500 text-xs pl-2">
+                            <RefreshCw className="animate-spin" size={12} /> Styling you...
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-4 border-t border-white/10 bg-zinc-900 flex gap-2">
+                    <input 
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                        placeholder="Ask for a fit check..."
+                        className="flex-1 bg-black border border-zinc-700 rounded-full px-4 py-2 text-sm text-white focus:border-neon-pink outline-none"
+                    />
+                    <button onClick={handleSend} className="bg-neon-pink p-2 rounded-full text-white hover:opacity-90">
+                        <Send size={18} />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// 9. Main Application Container
+export default function VibeCheckApp() {
+  const [showLanding, setShowLanding] = useState(true);
+  const [activeTab, setActiveTab] = useState('home');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [products, setProducts] = useState(MOCK_PRODUCTS);
+  const [savedItems, setSavedItems] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [swipeIndex, setSwipeIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isStylistOpen, setIsStylistOpen] = useState(false); // New State
+  const [vibeScore, setVibeScore] = useState(0); 
+
+  // ----------------------------------------------------------------
+  // TODO: API INTEGRATION POINTS
+  // ----------------------------------------------------------------
+
+  // 1. Live Product Search
+  useEffect(() => {
+    if (searchQuery.length > 2) {
+      setIsLoading(true);
+      const timeout = setTimeout(() => {
+        const filtered = MOCK_PRODUCTS.filter(p => 
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.tags.some(t => t.includes(searchQuery.toLowerCase()))
+        );
+        setProducts(filtered.length > 0 ? filtered : MOCK_PRODUCTS); 
+        setIsLoading(false);
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [searchQuery]);
+
+  // ----------------------------------------------------------------
+  // HANDLERS
+  // ----------------------------------------------------------------
+
+  const toggleSave = (product) => {
+    if (savedItems.find(item => item.id === product.id)) {
+      setSavedItems(savedItems.filter(item => item.id !== product.id));
+    } else {
+      setSavedItems([...savedItems, product]);
+      setVibeScore(prev => prev + 10); // Gamification
+    }
+  };
+
+  const handleAddToCart = (product) => {
+      setCart(prev => {
+          const exists = prev.find(p => p.id === product.id);
+          if (exists) {
+              return prev.map(p => p.id === product.id ? {...p, quantity: p.quantity + 1} : p);
+          }
+          return [...prev, {...product, quantity: 1}];
+      });
+      setIsCartOpen(true);
+      setVibeScore(prev => prev + 50); // Big points for shopping
+  };
+
+  const updateCartQty = (id, delta) => {
+      setCart(prev => prev.map(p => {
+          if (p.id === id) {
+              return { ...p, quantity: Math.max(0, p.quantity + delta) };
+          }
+          return p;
+      }).filter(p => p.quantity > 0));
+  };
+
+  const handleCheckout = () => {
+      setIsCheckingOut(true);
+      setTimeout(() => {
+          setIsCheckingOut(false);
+          setCart([]);
+          setIsCartOpen(false);
+          setVibeScore(prev => prev + 200);
+          alert("Order Placed! Your Vibe Score just went up!");
+      }, 2000);
+  };
+
+  const handleSwipe = (direction) => {
+    if (direction === 'right') {
+      const product = products[swipeIndex];
+      if (!savedItems.find(i => i.id === product.id)) {
+        setSavedItems(prev => [...prev, product]);
+        setVibeScore(prev => prev + 10);
+      }
+    }
+    // Move to next card
+    if (swipeIndex < products.length - 1) {
+      setSwipeIndex(prev => prev + 1);
+    } else {
+      setSwipeIndex(0); 
+    }
+  };
+
+  const shareOutfit = () => {
+    setVibeScore(prev => prev + 20);
+    alert("Copied outfit link to clipboard! 🔗 (+20 Vibe Score)");
+  };
+
+  // ----------------------------------------------------------------
+  // UI RENDER
+  // ----------------------------------------------------------------
+
+  // 1. Landing Page (Default View)
+  if (showLanding) {
+    return <LandingPage onEnter={() => setShowLanding(false)} />;
+  }
+
+  // 2. Main App View
+  return (
+    <div className="flex flex-col h-screen bg-black text-white font-sans overflow-hidden max-w-md mx-auto shadow-2xl relative border-x border-gray-900">
+      
+      {/* Top Header */}
+      {activeTab !== 'swipe' && activeTab !== 'tryon' && (
+        <div className="p-4 pt-6 bg-gradient-to-b from-black to-transparent z-10 sticky top-0">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-3xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-neon-green to-neon-pink cursor-pointer" onClick={() => setShowLanding(true)}>
+              VibeCheck
+            </h1>
+            <div className="flex items-center gap-2">
+                <button 
+                    onClick={() => setIsStylistOpen(true)}
+                    className="flex items-center gap-1 bg-zinc-900 text-neon-green text-[10px] font-bold px-2 py-1 rounded-full border border-neon-green/30 hover:bg-neon-green/10"
+                >
+                    <Sparkles size={12} /> AI Stylist
+                </button>
+
+                <div className="flex items-center bg-gray-900 rounded-full px-3 py-1 border border-gray-800">
+                   <Zap size={12} className="text-yellow-400 mr-1 fill-current" />
+                   <span className="text-xs font-bold font-mono text-white">{vibeScore}</span>
+                </div>
+
+                <button 
+                  onClick={() => setIsCartOpen(true)}
+                  className="relative p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition-colors"
+                >
+                  <ShoppingBag size={20} />
+                  {cart.length > 0 && (
+                    <span className="absolute top-0 right-0 w-3 h-3 bg-neon-pink rounded-full border-2 border-black flex items-center justify-center text-[8px] font-bold"></span>
+                  )}
+                </button>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <input 
+              type="text" 
+              placeholder="Find your vibe (e.g. 'rave outfit')"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-full py-3 px-12 text-sm text-white focus:outline-none focus:border-neon-green transition-colors shadow-inner shadow-black/50"
+            />
+            <Search className="absolute left-4 top-3 text-gray-500" size={18} />
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <div className="flex-grow overflow-y-auto no-scrollbar pb-24">
+        
+        {/* HOME / TRENDING FEED */}
+        {activeTab === 'home' && (
+          <div className="px-4">
+            {/* AI Outfit Suggestion Banner */}
+            {searchQuery === '' && (
+              <div className="mb-6">
+                <h2 className="text-lg font-bold mb-3 flex items-center">
+                  <Sparkles size={16} className="text-yellow-400 mr-2" /> AI Curated For You
+                </h2>
+                <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+                  {MOCK_OUTFIT_SUGGESTIONS.map(outfit => (
+                    <div key={outfit.id} className="min-w-[200px] h-32 relative rounded-xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity">
+                       <img src={outfit.image} className="w-full h-full object-cover" alt="Outfit" />
+                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[2px]">
+                          <span className="font-bold text-white text-center px-2 drop-shadow-lg">{outfit.title}</span>
+                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Product Feed */}
+            <div>
+              <div className="flex justify-between items-end mb-4">
+                <h2 className="text-xl font-bold flex items-center">
+                  <TrendingUp size={20} className="text-neon-green mr-2" /> Trending Now
+                </h2>
+                <span className="text-xs text-gray-500 font-mono">LIVE</span>
+              </div>
+              
+              {isLoading ? (
+                <div className="flex justify-center py-10">
+                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-neon-green"></div>
+                </div>
+              ) : (
+                products.map(product => (
+                  <ProductCard 
+                    key={product.id} 
+                    product={product} 
+                    onOpen={setSelectedProduct}
+                    onSave={toggleSave} 
+                    isSaved={!!savedItems.find(i => i.id === product.id)} 
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* SWIPE MODE */}
+        {activeTab === 'swipe' && (
+          <div className="h-full relative bg-gray-950">
+             {products.length > 0 ? (
+               <SwipeCard 
+                 product={products[swipeIndex]} 
+                 onSwipe={handleSwipe} 
+               />
+             ) : (
+               <div className="flex flex-col items-center justify-center h-full text-zinc-500">
+                    <CheckCircle size={48} className="text-neon-green mb-4" />
+                    <p>All Vibes Checked.</p>
+               </div>
+             )}
+          </div>
+        )}
+
+        {/* CLOSET / SAVED */}
+        {activeTab === 'closet' && (
+          <div className="px-4 pt-4">
+             <div className="flex justify-between items-center mb-6">
+               <h2 className="text-2xl font-bold">My Closet</h2>
+               <button onClick={shareOutfit} className="text-neon-pink text-sm font-bold flex items-center bg-neon-pink/10 px-3 py-1 rounded-full hover:bg-neon-pink/20 transition-colors">
+                 <Share2 size={16} className="mr-1" /> Share Board
+               </button>
+             </div>
+             
+             {savedItems.length === 0 ? (
+               <div className="text-center py-20 text-gray-500">
+                 <Shirt size={48} className="mx-auto mb-4 opacity-50" />
+                 <p>Your closet is empty.</p>
+                 <p className="text-sm">Swipe or search to add items!</p>
+               </div>
+             ) : (
+               <div className="grid grid-cols-2 gap-4">
+                 {savedItems.map(item => (
+                   <div key={item.id} className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800 relative group" onClick={() => setSelectedProduct(item)}>
+                     <img src={item.image} alt={item.name} className="h-40 w-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                     {item.hasPriceDrop && (
+                       <div className="absolute top-0 right-0 bg-red-600 text-white text-[10px] font-bold px-2 py-1">
+                         SALE
+                       </div>
+                     )}
+                     <div className="p-3 bg-gray-900 relative z-10">
+                       <p className="font-bold text-sm truncate text-white">{item.name}</p>
+                       <p className="text-neon-green text-sm">${item.price}</p>
+                     </div>
+                     <button 
+                       onClick={(e) => { e.stopPropagation(); toggleSave(item); }} 
+                       className="absolute top-2 left-2 bg-black/60 p-1.5 rounded-full text-white hover:text-red-500 hover:bg-white backdrop-blur-md transition-all"
+                     >
+                        <X size={14} />
+                     </button>
+                   </div>
+                 ))}
+               </div>
+             )}
+
+             {/* Price Alert Simulation Section */}
+             {savedItems.some(i => i.hasPriceDrop) && (
+                <div className="mt-8 bg-zinc-900 p-4 rounded-xl border border-neon-green/30 animate-pulse">
+                  <h3 className="text-neon-green font-bold flex items-center mb-2">
+                    <DollarSign size={16} className="mr-1" /> Price Alerts
+                  </h3>
+                  <p className="text-xs text-gray-400">Items in your closet just dropped in price! Cop them now.</p>
+                </div>
+             )}
+          </div>
+        )}
+
+        {/* VIRTUAL TRY-ON */}
+        {activeTab === 'tryon' && (
+          <VirtualTryOn savedItems={savedItems} />
+        )}
+
+      </div>
+
+      {/* MODALS & DRAWERS */}
+      <ProductDetailModal 
+         product={selectedProduct} 
+         isOpen={!!selectedProduct} 
+         onClose={() => setSelectedProduct(null)} 
+         onAddToCart={handleAddToCart}
+         onSave={toggleSave}
+         isSaved={selectedProduct && savedItems.find(i => i.id === selectedProduct.id)}
+      />
+
+      <CartDrawer 
+        isOpen={isCartOpen} 
+        onClose={() => setIsCartOpen(false)} 
+        cartItems={cart}
+        onUpdateQty={updateCartQty}
+        onCheckout={handleCheckout}
+        isCheckingOut={isCheckingOut}
+      />
+
+      <AIStylistModal 
+        isOpen={isStylistOpen}
+        onClose={() => setIsStylistOpen(false)}
+        products={MOCK_PRODUCTS}
+        onAddToCart={handleAddToCart}
+      />
+
+      {/* Bottom Navigation Bar */}
+      <div className="absolute bottom-0 w-full bg-gray-950/90 backdrop-blur-lg border-t border-white/5 flex justify-around items-center py-4 pb-6 z-50">
+        <NavButton 
+          icon={<Home size={24} />} 
+          label="Home" 
+          active={activeTab === 'home'} 
+          onClick={() => setActiveTab('home')} 
+        />
+        <NavButton 
+          icon={<Sparkles size={24} />} 
+          label="Swipe" 
+          active={activeTab === 'swipe'} 
+          onClick={() => setActiveTab('swipe')} 
+        />
+        <div className="w-12"></div> {/* Spacing for center button */}
+        <NavButton 
+          icon={<Shirt size={24} />} 
+          label="Closet" 
+          active={activeTab === 'closet'} 
+          onClick={() => setActiveTab('closet')} 
+        />
+        <NavButton 
+          icon={<Camera size={24} />} 
+          label="Try-On" 
+          active={activeTab === 'tryon'} 
+          onClick={() => setActiveTab('tryon')} 
+        />
+
+        {/* Floating Action Button (Center) */}
+        <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
+          <button 
+            onClick={() => setActiveTab('swipe')}
+            className="w-14 h-14 bg-gradient-to-r from-neon-green to-teal-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(57,255,20,0.4)] border-4 border-black hover:scale-110 transition-transform group"
+          >
+            <Sparkles size={24} className="text-black fill-current group-hover:rotate-12 transition-transform" />
+          </button>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+// Helper Sub-Component for Navigation
+const NavButton = ({ icon, label, active, onClick }) => (
+  <button 
+    onClick={onClick}
+    className={`flex flex-col items-center justify-center w-16 transition-colors ${active ? 'text-neon-green' : 'text-gray-500 hover:text-white'}`}
+  >
+    <div className={`mb-1 transition-transform ${active ? 'scale-110 drop-shadow-[0_0_5px_rgba(57,255,20,0.5)]' : ''}`}>{icon}</div>
+    <span className="text-[10px] font-bold tracking-wide">{label}</span>
+  </button>
+);
+  </script>
+</body>
+</html>
